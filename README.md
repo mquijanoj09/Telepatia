@@ -172,7 +172,7 @@ npm install
    cp .env.example .env
    ```
 
-2. **Editar el archivo `.env`:**
+2. **Editar el archivo `.env.example (debes cambiar el nombre del archivo a .env)`:**
 
    ```bash
    nano .env  # o usa tu editor preferido
