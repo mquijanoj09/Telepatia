@@ -2,15 +2,13 @@
 
 Sistema de inteligencia artificial médica que procesa consultas de voz para generar transcripciones, extraer información médica relevante y proporcionar diagnósticos preliminares.
 
-## Breve Descripción Técnica
+## 🏗️ Arquitectura del Sistema
 
 **Telepatía** es una aplicación full-stack que combina:
 
 - **Backend**: Firebase Cloud Functions con Node.js 20 y APIs de OpenAI
 - **Frontend**: React 19.1.0 con TypeScript, Vite y Tailwind CSS
 - **AI/ML**: Integración con OpenAI Whisper (transcripción) y GPT-3.5-turbo (análisis médico)
-
-### Arquitectura del Sistema
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -26,371 +24,393 @@ Sistema de inteligencia artificial médica que procesa consultas de voz para gen
 2. **Extracción**: Texto → GPT-3.5 → Información médica estructurada
 3. **Diagnóstico**: Info médica → GPT-3.5 → Diagnóstico preliminar
 
-## Decisiones de Diseño Relevantes
-
-### Backend (Firebase Functions)
-
-- **Firebase Functions v2**: Mayor rendimiento y escalabilidad
-- **OpenAI SDK**: Integración directa con Whisper y GPT APIs
-- **CORS configurado**: Permite llamadas desde el frontend
-- **Variables de entorno**: Configuración segura de API keys
-- **TypeScript**: Tipado fuerte para confiabilidad del código
-
-### Frontend (React + TypeScript)
-
-- **Arquitectura de componentes**: 15+ componentes modulares y reutilizables
-- **Custom hooks**: Lógica de estado y efectos encapsulada
-- **Service layer**: Abstracción de llamadas API
-- **Tailwind CSS**: Diseño responsive y consistente
-- **TypeScript interfaces**: Tipado completo para datos médicos
-
-### Configuración Dinámica
-
-- **Variables de entorno**: Configuración flexible para desarrollo/producción
-- **Detección automática**: Cambia entre APIs local y remota según el entorno
-- **URLs configurables**: Soporte para emuladores locales y Cloud Functions
-
-## Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 telepatia/
 ├── back/                           # Backend Firebase
-│   ├── firebase.json              # Configuración Firebase
-│   └── functions/                 # Cloud Functions
-│       ├── package.json          # Dependencias Node.js
-│       ├── tsconfig.json         # TypeScript config
+│   ├── .env.project-id            # Variables de entorno del backend
+│   ├── .firebaserc               # Configuración del proyecto Firebase
+│   ├── firebase.json             # Configuración Firebase
+│   └── functions/                # Cloud Functions
+│       ├── package.json         # Dependencias Node.js
+│       ├── tsconfig.json        # TypeScript config
 │       └── src/
-│           └── index.ts          # Funciones principales
+│           └── index.ts         # Funciones principales
 │
-└── front/                          # Frontend React
-    ├── package.json              # Dependencias React
-    ├── vite.config.ts           # Configuración Vite
-    ├── .env                     # Variables de entorno
-    ├── .env.example             # Plantilla de variables
+└── front/                         # Frontend React
+    ├── .env                      # Variables de entorno (crear desde .env.example)
+    ├── .env.example             # Plantilla de variables de entorno
+    ├── package.json             # Dependencias React
+    ├── vite.config.ts          # Configuración Vite
     └── src/
-        ├── App.tsx              # Componente principal
-        ├── main.tsx             # Entry point
-        ├── components/          # Componentes React
-        ├── config/              # Configuración API
-        ├── services/            # Llamadas API
-        ├── types/               # Interfaces TypeScript
-        └── hooks/               # Custom hooks
+        ├── App.tsx             # Componente principal
+        ├── config/
+        │   └── api.ts          # Configuración de APIs
+        ├── components/         # Componentes React
+        ├── services/           # Llamadas API
+        ├── types/              # Interfaces TypeScript
+        └── hooks/              # Custom hooks
 ```
 
-## Configuración del Proyecto
+## 🚀 Configuración Paso a Paso
 
 ### Prerrequisitos
 
-- Node.js 20+
-- npm o yarn
-- Firebase CLI
-- Cuenta de OpenAI con créditos
-- Cuenta de Firebase
+Antes de comenzar, asegúrate de tener instalado:
 
-### Instalación Inicial
+- **Node.js 20+** - [Descargar aquí](https://nodejs.org/)
+- **npm o yarn** - Viene incluido con Node.js
+- **Git** - [Descargar aquí](https://git-scm.com/)
 
-1. **Clonar el repositorio**
+### 📋 Paso 1: Clonar el Repositorio
 
 ```bash
-cd /path/to/telepatia
+git clone https://github.com/mquijanoj09/telepatia.git
+cd telepatia
 ```
 
-2. **Instalar Firebase CLI** (si no está instalado)
+### 🔑 Paso 2: Configurar Firebase
+
+#### 2.1 Crear un Proyecto en Firebase
+
+1. Ve a [Firebase Console](https://console.firebase.google.com)
+2. Haz clic en "Crear un proyecto"
+3. Sigue el asistente de configuración
+4. **Importante**: Anota tu **Project ID** (lo necesitarás más adelante)
+
+#### 2.2 Instalar Firebase CLI
 
 ```bash
 npm install -g firebase-tools
 ```
 
-3. **Autenticarse en Firebase**
+#### 2.3 Autenticarse en Firebase
 
 ```bash
 firebase login
 ```
 
-### Configuración del Backend
-
-1. **Ir al directorio de funciones**
-
-```bash
-cd back/functions
-```
-
-2. **Instalar dependencias**
-
-```bash
-npm install
-```
-
-3. **Configurar variables de entorno de Firebase**
-
-```bash
-# Configurar la API key de OpenAI
-firebase functions:config:set openai.api_key="tu-openai-api-key-aqui"
-
-# Verificar configuración
-firebase functions:config:get
-```
-
-4. **Compilar TypeScript**
-
-```bash
-npm run build
-```
-
-### Configuración del Frontend
-
-1. **Ir al directorio del frontend**
-
-```bash
-cd front
-```
-
-2. **Instalar dependencias**
-
-```bash
-npm install
-```
-
-3. **Configurar variables de entorno**
-
-```bash
-# Copiar archivo de ejemplo
-cp .env.example .env
-
-# Editar .env según tu configuración:
-# VITE_USE_LOCAL_BACKEND=true    # Para desarrollo local
-# VITE_USE_PRODUCTION_API=false  # Para usar Firebase local
-```
-
-## APIs Utilizadas
-
-### OpenAI APIs
-
-1. **Whisper API** (Speech-to-Text)
-
-   - **Propósito**: Transcripción de audio médico
-   - **Modelo**: `whisper-1`
-   - **Input**: Archivos de audio (mp3, wav, etc.)
-   - **Output**: Texto transcrito
-
-2. **GPT-3.5-turbo** (Análisis médico)
-   - **Propósito**: Extracción de información y diagnóstico
-   - **Configuración**: Temperature 0.3 para respuestas consistentes
-   - **Prompts especializados**: Contexto médico específico
-
-### Configuración de OpenAI
-
-1. **Obtener API Key**
-
-   - Ir a [OpenAI Platform](https://platform.openai.com/api-keys)
-   - Crear nueva API key
-   - Asegurar créditos suficientes en la cuenta
-
-2. **Configurar en Firebase**
-
-```bash
-firebase functions:config:set openai.api_key="sk-tu-clave-aqui"
-```
-
-## Ejecutar el Proyecto Localmente
-
-### Opción 1: Backend Local + Frontend Local
-
-1. **Terminal 1: Emuladores Firebase**
+#### 2.4 Configurar el Proyecto Local
 
 ```bash
 cd back
-firebase emulators:start --only functions
+firebase use --add
+# Selecciona tu proyecto de Firebase cuando se te solicite
 ```
 
-2. **Terminal 2: Frontend React**
+### 🔧 Paso 3: Configurar el Backend
 
-```bash
-cd front
-npm run dev
-```
-
-3. **Configurar variables de entorno en `.env`:**
-
-```env
-VITE_USE_LOCAL_BACKEND=true
-VITE_USE_PRODUCTION_API=false
-```
-
-### Opción 2: Backend Producción + Frontend Local
-
-1. **Terminal: Frontend React**
-
-```bash
-cd front
-npm run dev
-```
-
-2. **Configurar variables de entorno en `.env`:**
-
-```env
-VITE_USE_LOCAL_BACKEND=false
-VITE_USE_PRODUCTION_API=true
-```
-
-## Despliegue en Producción
-
-### Desplegar Backend
-
-1. **Compilar y desplegar funciones**
+#### 3.1 Instalar Dependencias
 
 ```bash
 cd back/functions
+npm install
+```
+
+#### 3.2 Configurar Variables de Entorno del Backend
+
+1. **Encuentra tu Project ID de Firebase:**
+
+   - Abre Firebase Console
+   - Ve a ⚙️ Project Settings
+   - Copia el "Project ID"
+
+2. **Crear archivo de configuración:**
+
+   ```bash
+   cd back  # Asegúrate de estar en el directorio back/
+   cp .env.project-id .env.tu-project-id-aqui
+   ```
+
+   **Ejemplo:** Si tu Project ID es `mi-proyecto-medico-123`, ejecuta:
+
+   ```bash
+   cp .env.project-id .env.mi-proyecto-medico-123
+   ```
+
+3. **Obtener API Key de OpenAI:**
+
+   - Ve a [OpenAI Platform](https://platform.openai.com/api-keys)
+   - Haz clic en "Create new secret key"
+   - Copia la clave (empieza con `sk-`)
+   - **⚠️ Importante**: Asegúrate de tener créditos en tu cuenta OpenAI
+
+4. **Editar el archivo `.env.tu-project-id-aqui`:**
+
+   ```bash
+   nano .env.tu-project-id-aqui  # o usa tu editor preferido
+   ```
+
+   Reemplaza el contenido con:
+
+   ```env
+   # OpenAI API Configuration
+   OPENAI_API_KEY=sk-tu-clave-openai-aqui
+   ```
+
+#### 3.3 Compilar el Backend
+
+```bash
 npm run build
-cd ..
-firebase deploy --only functions
 ```
 
-2. **Verificar despliegue**
+### ⚛️ Paso 4: Configurar el Frontend
+
+#### 4.1 Instalar Dependencias
 
 ```bash
-firebase functions:log
+cd front  # Desde la raíz del proyecto
+npm install
 ```
 
-### Desplegar Frontend
+#### 4.2 Configurar Variables de Entorno del Frontend
 
-1. **Construir para producción**
+1. **Crear archivo de configuración:**
 
-```bash
-cd front
-npm run build
-```
+   ```bash
+   cp .env.example .env
+   ```
 
-2. **Opción A: Desplegar en Firebase Hosting**
+2. **Editar el archivo `.env`:**
 
-```bash
-# Configurar hosting en firebase.json
-firebase deploy --only hosting
-```
+   ```bash
+   nano .env  # o usa tu editor preferido
+   ```
 
-2. **Opción B: Desplegar en otro servicio**
+   Reemplaza el contenido con tu configuración:
 
-```bash
-# Los archivos están en /front/dist
-# Subir contenido de dist/ a tu servicio de hosting
-```
+   ```env
+   # Firebase Configuration
+   # Reemplaza con los datos de tu proyecto Firebase
 
-## Testing y Desarrollo
+   # Tu Project ID de Firebase (el mismo que usaste en el backend)
+   VITE_FIREBASE_PROJECT_ID=tu-project-id-aqui
 
-### Probar con Audio
+   # Región donde están desplegadas tus funciones (normalmente us-central1)
+   VITE_FIREBASE_REGION=us-central1
+   ```
 
-1. **Subir archivo a Google Drive** (temporal)
-2. **Obtener link público** con `id` del archivo
-3. **Usar formato**: `https://drive.google.com/uc?id=FILE_ID`
-4. **Probar en la aplicación** con el link
+   **Ejemplo completo:**
 
-### Monitoreo y Logs
+   ```env
+   # Firebase Configuration
+   VITE_FIREBASE_PROJECT_ID=mi-proyecto-medico-123
+   VITE_FIREBASE_REGION=us-central1
+   ```
 
-```bash
-# Ver logs de funciones en tiempo real
-firebase functions:log --only=processCompleteConsultation
+### 🔥 Paso 5: Ejecutar el Proyecto Localmente
 
-# Ver logs específicos
-firebase functions:log --only=transcribeAudio
-```
+#### Opción A: Desarrollo Local Completo (Recomendado)
 
-### Debugging
+1. **Terminal 1 - Backend (Emuladores Firebase):**
 
-1. **Frontend**: Usar DevTools del navegador
-2. **Backend**: Logs de Firebase Functions
-3. **APIs**: Monitor en OpenAI dashboard
+   ```bash
+   cd back
+   firebase emulators:start --only functions
+   ```
 
-## Variables de Entorno
+   **Deberías ver algo como:**
 
-### Frontend (.env)
+   ```
+   ┌─────────────────────────────────────────────────────────────┐
+   │ ✔  All emulators ready! It is now safe to connect your app. │
+   │ i  View Emulator UI at http://127.0.0.1:4000/               │
+   └─────────────────────────────────────────────────────────────┘
+
+   ┌────────────────┬────────────────┬─────────────────────────────────┐
+   │ Emulator       │ Host:Port      │ View in Emulator UI             │
+   ├────────────────┼────────────────┼─────────────────────────────────┤
+   │ Functions      │ 127.0.0.1:5001│ http://127.0.0.1:4000/functions │
+   └────────────────┴────────────────┴─────────────────────────────────┘
+   ```
+
+2. **Terminal 2 - Frontend:**
+
+   ```bash
+   cd front
+   npm run dev
+   ```
+
+   **Deberías ver:**
+
+   ```
+   VITE v5.0.0  ready in 200 ms
+
+   ➜  Local:   http://localhost:5173/
+   ➜  Network: use --host to expose
+   ```
+
+3. **Abrir la aplicación:**
+   - Ve a http://localhost:5173/
+   - La aplicación se conectará automáticamente a:
+     `http://127.0.0.1:5001/tu-project-id/us-central1/processCompleteConsultation`
+
+## 🔧 Variables de Entorno - Referencia Completa
+
+### Frontend (`.env`)
 
 ```env
-# Configuración de API
-VITE_USE_LOCAL_BACKEND=true|false      # Forzar backend local
-VITE_USE_PRODUCTION_API=true|false     # Forzar API de producción
+# 🔥 Firebase Configuration
+VITE_FIREBASE_PROJECT_ID=tu-project-id       # Tu Project ID de Firebase
+VITE_FIREBASE_REGION=us-central1              # Región de tus Cloud Functions
+
+# 🔍 Cómo encontrar estos valores:
+# 1. Firebase Console → Project Settings → Project ID
+# 2. Cloud Functions → ubicación mostrada en la consola
 ```
 
-### Backend (Firebase Config)
+### Backend (`.env.tu-project-id`)
 
-```bash
-# OpenAI API Key
-openai.api_key: "sk-..."
+```env
+# 🤖 OpenAI Configuration
+OPENAI_API_KEY=sk-xxxxxxxxx                  # Tu API Key de OpenAI
 
-# Verificar configuración
-firebase functions:config:get
+# 🔍 Cómo obtener:
+# 1. https://platform.openai.com/api-keys
+# 2. Create new secret key
+# 3. Asegúrate de tener créditos en tu cuenta
 ```
 
-## Comandos Útiles
+## 🛠️ Comandos Útiles
 
 ### Desarrollo
 
 ```bash
-# Backend: Emuladores
-cd back && firebase emulators:start
+# Backend: Iniciar emuladores
+cd back && firebase emulators:start --only functions
 
 # Frontend: Servidor de desarrollo
 cd front && npm run dev
 
-# Frontend: Build
+# Frontend: Build para producción
 cd front && npm run build
 
-# Backend: Deploy
+# Backend: Deploy a producción
 cd back && firebase deploy --only functions
 ```
 
-### Debugging
+### Debugging y Monitoreo
 
 ```bash
-# Logs en tiempo real
+# Ver logs en tiempo real
 firebase functions:log
 
-# Estado de Firebase
+# Ver logs de una función específica
+firebase functions:log --only processCompleteConsultation
+
+# Verificar configuración de Firebase
+firebase functions:config:get
+
+# Ver proyectos disponibles
 firebase projects:list
 
-# Información del proyecto
+# Ver qué proyecto está activo
 firebase use
 ```
 
-## Solución de Problemas Comunes
+## 🚨 Solución de Problemas Comunes
 
-### Error: OpenAI API Quota Exceeded (429)
+### ❌ Error: "OPENAI_API_KEY is not defined"
 
-**Problema**: Sin créditos en OpenAI
-**Solución**: Agregar créditos en [OpenAI Billing](https://platform.openai.com/account/billing)
+**Problema:** El backend no encuentra la API key de OpenAI
 
-### Error: CORS
+**Solución:**
 
-**Problema**: Frontend no puede conectar al backend
-**Solución**: Verificar configuración de CORS en las funciones
+1. Verifica que creaste el archivo `.env.tu-project-id` correctamente
+2. Asegúrate de que el nombre del archivo coincida exactamente con tu Project ID
+3. Verifica que la variable `OPENAI_API_KEY` esté configurada
 
-### Error: Firebase Functions not found
+```bash
+# Verificar archivo
+ls -la back/.env.*
 
-**Problema**: URLs incorrectas o funciones no desplegadas
-**Solución**:
+# Verificar contenido
+cat back/.env.tu-project-id
+```
 
-1. Verificar despliegue: `firebase deploy --only functions`
-2. Verificar URLs en configuración API
+### ❌ Error: "VITE_FIREBASE_PROJECT_ID is not defined"
 
-### Error: Environment variables
+**Problema:** El frontend no encuentra la configuración de Firebase
 
-**Problema**: Variables de entorno no definidas
-**Solución**:
+**Solución:**
 
-1. Frontend: Verificar archivo `.env`
-2. Backend: `firebase functions:config:set`
+1. Verifica que existe el archivo `front/.env`
+2. Asegúrate de que `VITE_FIREBASE_PROJECT_ID` esté configurado
+3. Reinicia el servidor de desarrollo
 
-## Contribuir
+```bash
+# Verificar archivo
+cat front/.env
 
-1. Hacer fork del proyecto
-2. Crear feature branch
-3. Hacer commit de cambios
-4. Push a la branch
-5. Crear Pull Request
+# Reiniciar frontend
+cd front && npm run dev
+```
 
-## Licencia
+### ❌ Error: "Failed to connect to emulators"
 
-[Especificar licencia del proyecto]
+**Problema:** El frontend no puede conectar con los emuladores
+
+**Solución:**
+
+1. Verifica que los emuladores estén corriendo:
+   ```bash
+   cd back && firebase emulators:start --only functions
+   ```
+2. Verifica que la URL en el frontend sea correcta
+3. Comprueba que no haya conflictos de puertos
+
+### ❌ Error: "OpenAI API quota exceeded" (429)
+
+**Problema:** Sin créditos en OpenAI
+
+**Solución:**
+
+1. Ve a [OpenAI Billing](https://platform.openai.com/account/billing)
+2. Agrega créditos a tu cuenta
+3. Verifica el uso actual en el dashboard
+
+### ❌ Error: "Firebase project not found"
+
+**Problema:** Proyecto Firebase mal configurado
+
+**Solución:**
+
+1. Verifica el Project ID en Firebase Console
+2. Ejecuta: `firebase use --add` y selecciona el proyecto correcto
+3. Asegúrate de que `.firebaserc` tenga el Project ID correcto
+
+## 📝 Notas Importantes
+
+### 🔒 Seguridad
+
+- ⚠️ **Nunca** commites archivos `.env` al repositorio
+- 🔑 Mantén las API keys seguras y privadas
+- 🛡️ Usa variables de entorno en producción
+
+### 💰 Costos
+
+- 🤖 **OpenAI**: Pago por uso (Whisper + GPT-3.5-turbo)
+- 🔥 **Firebase**: Plan Spark (gratis) o Blaze (pago por uso)
+- 📊 Monitorea el uso en los dashboards respectivos
+
+### 🔄 Actualizaciones
+
+- 📦 Mantén las dependencias actualizadas
+- 🔍 Revisa logs regularmente para detectar errores
+- 📈 Monitorea el rendimiento en producción
+
+## 📞 Soporte
+
+Si encuentras problemas:
+
+1. 📋 Revisa la sección "Solución de Problemas"
+2. 📖 Consulta la documentación oficial:
+   - [Firebase Functions](https://firebase.google.com/docs/functions)
+   - [OpenAI API](https://platform.openai.com/docs)
+   - [Vite](https://vitejs.dev/)
+3. 🐛 Crea un issue en el repositorio con detalles del error
 
 ---
 
-**Desarrollado con ❤️ usando React, Firebase y OpenAI**
+**Desarrollado usando React, Firebase y OpenAI**

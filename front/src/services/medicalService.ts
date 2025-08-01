@@ -12,7 +12,7 @@ export const medicalService = {
       inputType === "text" ? { text: textInput } : { audioUrl: audioUrl };
 
     const response = await axios.post<ApiResponse>(
-      API_BASE_URL, // Direct function URL, no path needed
+      `${API_BASE_URL}/processCompleteConsultation`,
       payload,
       {
         headers: {
