@@ -2,14 +2,19 @@
  * Medical AI Chain Functions
  *
  * Chain of three functions:
- * 1. Audio transcription (Speech-to-Text)
- * 2. Medical information extraction (LLM)
- * 3. Diagnosis generation (LLM)
+ * 1. Audio transcription (Speech-to-Text) - OpenAI Whisper
+ * 2. Medical information extraction (LLM) - OpenAI GPT
+ * 3. Diagnosis generation (LLM) - OpenAI GPT
  */
 
 import { setGlobalOptions } from "firebase-functions";
 import { onRequest } from "firebase-functions/https";
 import * as logger from "firebase-functions/logger";
+import OpenAI from "openai";
+import { defineString } from "firebase-functions/params";
+
+// Define the OpenAI API key parameter
+const openaiApiKey = defineString("OPENAI_API_KEY");
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -21,6 +26,11 @@ import * as logger from "firebase-functions/logger";
 // `maxInstances` option in the function's options, e.g.
 // `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
 setGlobalOptions({ maxInstances: 10 });
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: openaiApiKey.value(), // Use the parameter value
+});
 
 // Types for structured medical data
 interface PatientInfo {
@@ -64,240 +74,195 @@ function handlePreflight(request: any, response: any): boolean {
 }
 
 /**
- * Function 1: Audio Transcription
- * Receives an audio URL and transcribes it to text
+ * Step 1: Transcribe audio using OpenAI Whisper
  */
-export const transcribeAudio = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-
-  if (handlePreflight(request, response)) return;
-
+async function transcribeAudioWithWhisper(audioUrl: string): Promise<string> {
   try {
-    logger.info("Audio transcription started", { structuredData: true });
+    logger.info("Starting audio transcription with Whisper", { audioUrl });
 
-    // Validate request
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
+    // Download the audio file
+    const response = await fetch(audioUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download audio: ${response.statusText}`);
     }
 
-    const { audioUrl } = request.body;
+    const audioBuffer = await response.arrayBuffer();
+    const audioFile = new File([audioBuffer], "audio.mp3", {
+      type: "audio/mpeg",
+    });
 
-    if (!audioUrl) {
-      response.status(400).json({ error: "audioUrl is required" });
-      return;
-    }
-
-    // TODO: Implement actual audio transcription
-    // For now, we'll simulate the transcription
-    // In real implementation, you would use:
-    // - Google Speech-to-Text API
-    // - OpenAI Whisper API
-    // - Azure Speech Services
-
-    const mockTranscription =
-      "Patient John Doe, 35 years old, ID 12345678. Presents with fever, headache, and sore throat for the past 3 days. Temperature 38.5°C. Patient reports difficulty swallowing and fatigue. No recent travel history. Seeking consultation for possible viral infection.";
+    // Transcribe with Whisper
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: "whisper-1",
+      language: "es", // Spanish - adjust as needed
+      prompt:
+        "Esta es una consulta médica. El paciente describe sus síntomas al doctor.",
+    });
 
     logger.info("Audio transcription completed", {
-      audioUrl,
-      transcriptionLength: mockTranscription.length,
-      structuredData: true,
+      transcriptionLength: transcription.text.length,
     });
 
-    response.json({
-      success: true,
-      transcription: mockTranscription,
-      audioUrl,
-      timestamp: new Date().toISOString(),
-    });
+    return transcription.text;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Audio transcription failed", { error: errorMessage });
-    response.status(500).json({
-      error: "Transcription failed",
-      details: errorMessage,
-    });
+    logger.error("Audio transcription failed", { error });
+    throw new Error(
+      `Transcription failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
-});
+}
 
 /**
- * Function 2: Medical Information Extraction
- * Processes text and extracts structured medical information
+ * Step 2: Extract medical information using OpenAI GPT
  */
-export const extractMedicalInfo = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-
-  if (handlePreflight(request, response)) return;
-
+async function extractMedicalInfoWithGPT(
+  text: string
+): Promise<MedicalExtraction> {
   try {
-    logger.info("Medical information extraction started", {
-      structuredData: true,
+    logger.info("Starting medical information extraction", {
+      textLength: text.length,
     });
 
-    // Validate request
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
-    }
+    const prompt = `Analyze the following medical consultation text and extract structured information. Return a JSON object with the following structure:
 
-    const { text } = request.body;
+{
+  "symptoms": ["symptom1", "symptom2", ...],
+  "patient": {
+    "name": "patient name if mentioned",
+    "age": number or null,
+    "id": "patient ID if mentioned",
+    "gender": "male/female/other or null"
+  },
+  "consultationReason": "brief summary of why the patient is seeking consultation"
+}
 
-    if (!text) {
-      response.status(400).json({ error: "text is required" });
-      return;
-    }
+Medical consultation text:
+${text}
 
-    // TODO: Implement actual LLM extraction
-    // For now, we'll simulate the extraction
-    // In real implementation, you would use:
-    // - OpenAI GPT API with structured outputs
-    // - Google Gemini API
-    // - Anthropic Claude API
+Please extract only the information explicitly mentioned in the text. If information is not available, use null for optional fields.`;
 
-    const extractedInfo: MedicalExtraction = {
-      symptoms: [
-        "fever",
-        "headache",
-        "sore throat",
-        "difficulty swallowing",
-        "fatigue",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a medical information extraction specialist. Extract structured data from medical consultations and return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
       ],
-      patient: {
-        name: "John Doe",
-        age: 35,
-        id: "12345678",
-        gender: "male",
-      },
-      consultationReason:
-        "Possible viral infection with fever, headache, and throat symptoms lasting 3 days",
-    };
+      temperature: 0.1,
+      max_tokens: 1000,
+    });
+
+    const extractedText = completion.choices[0]?.message?.content;
+    if (!extractedText) {
+      throw new Error("No response from OpenAI");
+    }
+
+    // Parse the JSON response
+    const extractedInfo = JSON.parse(extractedText) as MedicalExtraction;
 
     logger.info("Medical information extraction completed", {
-      textLength: text.length,
-      symptomsCount: extractedInfo.symptoms.length,
-      structuredData: true,
+      symptomsCount: extractedInfo.symptoms?.length || 0,
+      hasPatientInfo: !!extractedInfo.patient,
     });
 
-    response.json({
-      success: true,
-      extractedInfo,
-      originalText: text,
-      timestamp: new Date().toISOString(),
-    });
+    return extractedInfo;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Medical information extraction failed", {
-      error: errorMessage,
-    });
-    response.status(500).json({
-      error: "Medical extraction failed",
-      details: errorMessage,
-    });
+    logger.error("Medical information extraction failed", { error });
+    throw new Error(
+      `Medical extraction failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
-});
+}
 
 /**
- * Function 3: Diagnosis Generation
- * Generates diagnosis, treatment, and recommendations from structured medical data
+ * Step 3: Generate diagnosis and treatment using OpenAI GPT
  */
-export const generateDiagnosis = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-
-  if (handlePreflight(request, response)) return;
-
+async function generateDiagnosisWithGPT(
+  extractedInfo: MedicalExtraction,
+  originalText: string
+): Promise<DiagnosisResult> {
   try {
-    logger.info("Diagnosis generation started", { structuredData: true });
+    logger.info("Starting diagnosis generation", {
+      symptomsCount: extractedInfo.symptoms?.length || 0,
+    });
 
-    // Validate request
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
+    const prompt = `Based on the following medical information extracted from a patient consultation, provide a medical assessment. Return a JSON object with this structure:
+
+{
+  "diagnosis": "primary diagnosis based on symptoms",
+  "treatment": "recommended treatment plan",
+  "recommendations": "additional recommendations and follow-up instructions",
+  "fullReport": "complete detailed medical report"
+}
+
+Patient Information:
+- Name: ${extractedInfo.patient?.name || "Not specified"}
+- Age: ${extractedInfo.patient?.age || "Not specified"}
+- Gender: ${extractedInfo.patient?.gender || "Not specified"}
+- ID: ${extractedInfo.patient?.id || "Not specified"}
+
+Consultation Reason: ${extractedInfo.consultationReason}
+
+Symptoms: ${extractedInfo.symptoms?.join(", ") || "None specified"}
+
+Original consultation text:
+${originalText}
+
+Please provide a thorough but concise medical assessment. Include appropriate disclaimers about seeking professional medical care.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an experienced medical AI assistant. Provide thorough medical assessments based on patient symptoms and information. Always recommend consulting with healthcare professionals for definitive diagnosis and treatment. Return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+      max_tokens: 2000,
+    });
+
+    const diagnosisText = completion.choices[0]?.message?.content;
+    if (!diagnosisText) {
+      throw new Error("No response from OpenAI");
     }
 
-    const { medicalInfo } = request.body;
-
-    if (!medicalInfo) {
-      response.status(400).json({ error: "medicalInfo is required" });
-      return;
-    }
-
-    // TODO: Implement actual LLM diagnosis generation
-    // For now, we'll simulate the diagnosis
-    // In real implementation, you would use:
-    // - OpenAI GPT API for medical reasoning
-    // - Google Gemini Pro for diagnosis generation
-    // - Custom medical AI models
-
-    const diagnosisResult: DiagnosisResult = {
-      diagnosis:
-        "Viral upper respiratory tract infection (common cold/flu-like syndrome)",
-      treatment:
-        "Supportive care: Rest, increased fluid intake, acetaminophen or ibuprofen for fever and pain relief. Warm saltwater gargles for sore throat.",
-      recommendations:
-        "Monitor temperature, return if symptoms worsen or persist beyond 7-10 days. Seek immediate care if difficulty breathing, severe throat pain preventing swallowing, or high fever >39°C persists.",
-      fullReport: `MEDICAL REPORT
-
-Patient: ${medicalInfo.patient?.name || "Unknown"} (Age: ${
-        medicalInfo.patient?.age || "Unknown"
-      })
-ID: ${medicalInfo.patient?.id || "Unknown"}
-
-CONSULTATION REASON:
-${medicalInfo.consultationReason}
-
-SYMPTOMS:
-${medicalInfo.symptoms?.join(", ") || "None reported"}
-
-DIAGNOSIS:
-Viral upper respiratory tract infection (common cold/flu-like syndrome)
-
-TREATMENT PLAN:
-1. Supportive care with adequate rest
-2. Increased fluid intake (water, warm teas, broths)
-3. Acetaminophen 500mg every 6-8 hours for fever/pain (max 3g/day)
-4. Ibuprofen 400mg every 6-8 hours as alternative for pain/fever
-5. Warm saltwater gargles 3-4 times daily for throat symptoms
-
-RECOMMENDATIONS:
-- Continue current treatment regimen
-- Monitor body temperature regularly
-- Return for follow-up if symptoms worsen or persist beyond 7-10 days
-- Seek immediate medical attention if experiencing:
-  * Difficulty breathing or shortness of breath
-  * Severe throat pain preventing swallowing
-  * High fever >39°C (102.2°F) persisting >48 hours
-  * Signs of dehydration
-
-Generated on: ${new Date().toISOString()}`,
-    };
+    // Parse the JSON response
+    const diagnosisResult = JSON.parse(diagnosisText) as DiagnosisResult;
 
     logger.info("Diagnosis generation completed", {
-      patientName: medicalInfo.patient?.name,
-      symptomsCount: medicalInfo.symptoms?.length || 0,
-      structuredData: true,
+      diagnosisLength: diagnosisResult.diagnosis?.length || 0,
     });
 
-    response.json({
-      success: true,
-      diagnosis: diagnosisResult,
-      inputData: medicalInfo,
-      timestamp: new Date().toISOString(),
-    });
+    return diagnosisResult;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Diagnosis generation failed", { error: errorMessage });
-    response.status(500).json({
-      error: "Diagnosis generation failed",
-      details: errorMessage,
-    });
+    logger.error("Diagnosis generation failed", { error });
+    throw new Error(
+      `Diagnosis generation failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
-});
+}
 
 /**
- * Function 4: Complete Medical Chain
+ * Complete Medical Chain
  * Orchestrates the entire process from audio to diagnosis
  */
 export const processCompleteConsultation = onRequest(
@@ -330,81 +295,40 @@ export const processCompleteConsultation = onRequest(
 
       // Step 1: Transcribe audio if provided
       if (audioUrl && !text) {
-        // In real implementation, call the transcription service
-        transcription =
-          "Patient John Doe, 35 years old, ID 12345678. Presents with fever, headache, and sore throat for the past 3 days. Temperature 38.5°C. Patient reports difficulty swallowing and fatigue. No recent travel history. Seeking consultation for possible viral infection.";
+        logger.info("Processing audio transcription", { audioUrl });
+        transcription = await transcribeAudioWithWhisper(audioUrl);
       }
 
-      // Step 2: Extract medical information
-      const extractedInfo: MedicalExtraction = {
-        symptoms: [
-          "fever",
-          "headache",
-          "sore throat",
-          "difficulty swallowing",
-          "fatigue",
-        ],
-        patient: {
-          name: "John Doe",
-          age: 35,
-          id: "12345678",
-          gender: "male",
-        },
-        consultationReason:
-          "Possible viral infection with fever, headache, and throat symptoms lasting 3 days",
-      };
+      // Use provided text or transcribed audio
+      const inputText = transcription;
 
-      // Step 3: Generate diagnosis
-      const diagnosis =
-        "Viral upper respiratory tract infection (common cold/flu-like syndrome)";
-      const treatment =
-        "Supportive care: Rest, increased fluid intake, acetaminophen or ibuprofen for fever and pain relief. Warm saltwater gargles for sore throat.";
-      const recommendations =
-        "Monitor temperature, return if symptoms worsen or persist beyond 7-10 days. Seek immediate care if difficulty breathing, severe throat pain preventing swallowing, or high fever >39°C persists.";
+      // Step 2: Extract medical information using OpenAI
+      logger.info("Extracting medical information", {
+        inputLength: inputText.length,
+      });
+      const extractedInfo = await extractMedicalInfoWithGPT(inputText);
 
-      const diagnosisResult: DiagnosisResult = {
-        diagnosis,
-        treatment,
-        recommendations,
-        fullReport: `COMPLETE MEDICAL CONSULTATION REPORT
-
-Patient: ${extractedInfo.patient?.name || "Unknown"} (Age: ${
-          extractedInfo.patient?.age || "Unknown"
-        })
-ID: ${extractedInfo.patient?.id || "Unknown"}
-
-ORIGINAL INPUT: ${audioUrl ? "Audio transcription" : "Text input"}
-TRANSCRIPTION: ${transcription}
-
-CONSULTATION REASON:
-${extractedInfo.consultationReason}
-
-SYMPTOMS IDENTIFIED:
-${extractedInfo.symptoms?.join(", ") || "None reported"}
-
-MEDICAL ASSESSMENT:
-Diagnosis: ${diagnosis}
-
-TREATMENT PLAN:
-${treatment}
-
-RECOMMENDATIONS:
-${recommendations}
-
-Report generated: ${new Date().toISOString()}`,
-      };
+      // Step 3: Generate diagnosis using OpenAI
+      logger.info("Generating diagnosis", {
+        symptomsCount: extractedInfo.symptoms?.length || 0,
+      });
+      const diagnosisResult = await generateDiagnosisWithGPT(
+        extractedInfo,
+        inputText
+      );
 
       logger.info("Complete medical consultation completed", {
         hasAudio: !!audioUrl,
         hasText: !!text,
         patientName: extractedInfo.patient?.name,
+        diagnosisGenerated: !!diagnosisResult.diagnosis,
         structuredData: true,
       });
 
       response.json({
         success: true,
         result: {
-          transcription,
+          transcription: inputText,
           extractedInfo,
           diagnosis: diagnosisResult,
         },
@@ -423,3 +347,119 @@ Report generated: ${new Date().toISOString()}`,
     }
   }
 );
+
+/**
+ * Individual function: Audio Transcription
+ */
+export const transcribeAudio = onRequest(async (request, response) => {
+  setCorsHeaders(response);
+  if (handlePreflight(request, response)) return;
+
+  try {
+    if (request.method !== "POST") {
+      response.status(405).json({ error: "Method not allowed. Use POST." });
+      return;
+    }
+
+    const { audioUrl } = request.body;
+    if (!audioUrl) {
+      response.status(400).json({ error: "audioUrl is required" });
+      return;
+    }
+
+    const transcription = await transcribeAudioWithWhisper(audioUrl);
+
+    response.json({
+      success: true,
+      result: { transcription },
+      processedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    logger.error("Audio transcription failed", { error: errorMessage });
+    response.status(500).json({
+      error: "Transcription failed",
+      details: errorMessage,
+    });
+  }
+});
+
+/**
+ * Individual function: Medical Information Extraction
+ */
+export const extractMedicalInfo = onRequest(async (request, response) => {
+  setCorsHeaders(response);
+  if (handlePreflight(request, response)) return;
+
+  try {
+    if (request.method !== "POST") {
+      response.status(405).json({ error: "Method not allowed. Use POST." });
+      return;
+    }
+
+    const { text } = request.body;
+    if (!text) {
+      response.status(400).json({ error: "text is required" });
+      return;
+    }
+
+    const extractedInfo = await extractMedicalInfoWithGPT(text);
+
+    response.json({
+      success: true,
+      result: { extractedInfo },
+      processedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    logger.error("Medical extraction failed", { error: errorMessage });
+    response.status(500).json({
+      error: "Medical extraction failed",
+      details: errorMessage,
+    });
+  }
+});
+
+/**
+ * Individual function: Diagnosis Generation
+ */
+export const generateDiagnosis = onRequest(async (request, response) => {
+  setCorsHeaders(response);
+  if (handlePreflight(request, response)) return;
+
+  try {
+    if (request.method !== "POST") {
+      response.status(405).json({ error: "Method not allowed. Use POST." });
+      return;
+    }
+
+    const { extractedInfo, originalText } = request.body;
+    if (!extractedInfo || !originalText) {
+      response.status(400).json({
+        error: "extractedInfo and originalText are required",
+      });
+      return;
+    }
+
+    const diagnosisResult = await generateDiagnosisWithGPT(
+      extractedInfo,
+      originalText
+    );
+
+    response.json({
+      success: true,
+      result: { diagnosis: diagnosisResult },
+      processedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    logger.error("Diagnosis generation failed", { error: errorMessage });
+    response.status(500).json({
+      error: "Diagnosis generation failed",
+      details: errorMessage,
+    });
+  }
+});
