@@ -8,10 +8,15 @@
  */
 
 import { setGlobalOptions } from "firebase-functions";
-import { onRequest } from "firebase-functions/https";
 import * as logger from "firebase-functions/logger";
 import OpenAI from "openai";
 import { defineString } from "firebase-functions/params";
+import {
+  medicalConsultationEndpoint,
+  transcriptionEndpoint,
+  extractionEndpoint,
+  diagnosisEndpoint,
+} from "./middleware";
 
 // Define the OpenAI API key parameter
 const openaiApiKey = defineString("OPENAI_API_KEY");
@@ -51,26 +56,6 @@ interface DiagnosisResult {
   treatment: string;
   recommendations: string;
   fullReport: string;
-}
-
-// Helper function to set CORS headers
-function setCorsHeaders(response: any) {
-  response.set("Access-Control-Allow-Origin", "*");
-  response.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
-  );
-  response.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
-// Helper function to handle preflight requests
-function handlePreflight(request: any, response: any): boolean {
-  if (request.method === "OPTIONS") {
-    setCorsHeaders(response);
-    response.status(204).send("");
-    return true;
-  }
-  return false;
 }
 
 /**
@@ -265,32 +250,14 @@ Please provide a thorough but concise medical assessment. Include appropriate di
  * Complete Medical Chain
  * Orchestrates the entire process from audio to diagnosis
  */
-export const processCompleteConsultation = onRequest(
+export const processCompleteConsultation = medicalConsultationEndpoint(
   async (request, response) => {
-    setCorsHeaders(response);
-
-    if (handlePreflight(request, response)) return;
-
     try {
       logger.info("Complete medical consultation started", {
         structuredData: true,
       });
 
-      // Validate request
-      if (request.method !== "POST") {
-        response.status(405).json({ error: "Method not allowed. Use POST." });
-        return;
-      }
-
       const { audioUrl, text } = request.body;
-
-      if (!audioUrl && !text) {
-        response
-          .status(400)
-          .json({ error: "Either audioUrl or text is required" });
-        return;
-      }
-
       let transcription = text;
 
       // Step 1: Transcribe audio if provided
@@ -335,15 +302,7 @@ export const processCompleteConsultation = onRequest(
         processedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      logger.error("Complete medical consultation failed", {
-        error: errorMessage,
-      });
-      response.status(500).json({
-        error: "Complete consultation failed",
-        details: errorMessage,
-      });
+      throw error; // Let middleware handle the error
     }
   }
 );
@@ -351,115 +310,62 @@ export const processCompleteConsultation = onRequest(
 /**
  * Individual function: Audio Transcription
  */
-export const transcribeAudio = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-  if (handlePreflight(request, response)) return;
+export const transcribeAudio = transcriptionEndpoint(
+  async (request, response) => {
+    try {
+      const { audioUrl } = request.body;
+      const transcription = await transcribeAudioWithWhisper(audioUrl);
 
-  try {
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
+      response.json({
+        success: true,
+        result: { transcription },
+        processedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      throw error; // Let middleware handle the error
     }
-
-    const { audioUrl } = request.body;
-    if (!audioUrl) {
-      response.status(400).json({ error: "audioUrl is required" });
-      return;
-    }
-
-    const transcription = await transcribeAudioWithWhisper(audioUrl);
-
-    response.json({
-      success: true,
-      result: { transcription },
-      processedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Audio transcription failed", { error: errorMessage });
-    response.status(500).json({
-      error: "Transcription failed",
-      details: errorMessage,
-    });
   }
-});
+);
 
 /**
  * Individual function: Medical Information Extraction
  */
-export const extractMedicalInfo = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-  if (handlePreflight(request, response)) return;
+export const extractMedicalInfo = extractionEndpoint(
+  async (request, response) => {
+    try {
+      const { text } = request.body;
+      const extractedInfo = await extractMedicalInfoWithGPT(text);
 
-  try {
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
+      response.json({
+        success: true,
+        result: { extractedInfo },
+        processedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      throw error; // Let middleware handle the error
     }
-
-    const { text } = request.body;
-    if (!text) {
-      response.status(400).json({ error: "text is required" });
-      return;
-    }
-
-    const extractedInfo = await extractMedicalInfoWithGPT(text);
-
-    response.json({
-      success: true,
-      result: { extractedInfo },
-      processedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Medical extraction failed", { error: errorMessage });
-    response.status(500).json({
-      error: "Medical extraction failed",
-      details: errorMessage,
-    });
   }
-});
+);
 
 /**
  * Individual function: Diagnosis Generation
  */
-export const generateDiagnosis = onRequest(async (request, response) => {
-  setCorsHeaders(response);
-  if (handlePreflight(request, response)) return;
+export const generateDiagnosis = diagnosisEndpoint(
+  async (request, response) => {
+    try {
+      const { extractedInfo, originalText } = request.body;
+      const diagnosisResult = await generateDiagnosisWithGPT(
+        extractedInfo,
+        originalText
+      );
 
-  try {
-    if (request.method !== "POST") {
-      response.status(405).json({ error: "Method not allowed. Use POST." });
-      return;
-    }
-
-    const { extractedInfo, originalText } = request.body;
-    if (!extractedInfo || !originalText) {
-      response.status(400).json({
-        error: "extractedInfo and originalText are required",
+      response.json({
+        success: true,
+        result: { diagnosis: diagnosisResult },
+        processedAt: new Date().toISOString(),
       });
-      return;
+    } catch (error) {
+      throw error; // Let middleware handle the error
     }
-
-    const diagnosisResult = await generateDiagnosisWithGPT(
-      extractedInfo,
-      originalText
-    );
-
-    response.json({
-      success: true,
-      result: { diagnosis: diagnosisResult },
-      processedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    logger.error("Diagnosis generation failed", { error: errorMessage });
-    response.status(500).json({
-      error: "Diagnosis generation failed",
-      details: errorMessage,
-    });
   }
-});
+);
